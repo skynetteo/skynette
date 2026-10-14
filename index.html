@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>skynette@linux:~</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background-color: #121212;
+            font-family: 'Courier New', Consolas, Monaco, monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 15px;
+            color: #eaeaea;
+        }
+        .terminal-window {
+            width: 100%;
+            max-width: 700px;
+            height: 460px;
+            background-color: #1e1e1e;
+            border-radius: 8px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid #333;
+        }
+        .title-bar {
+            background-color: #2d2d2d;
+            padding: 10px 15px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #1a1a1a;
+            user-select: none;
+        }
+        .dots {
+            display: flex;
+            gap: 8px;
+        }
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        .dot.red { background-color: #ff5f56; }
+        .dot.yellow { background-color: #ffbd2e; }
+        .dot.green { background-color: #27c93f; }
+        .title {
+            flex-grow: 1;
+            text-align: center;
+            color: #999;
+            font-size: 0.85rem;
+            margin-right: 44px;
+        }
+        .terminal-body {
+            padding: 20px;
+            flex-grow: 1;
+            overflow-y: auto;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            cursor: text;
+        }
+        .output-line {
+            margin-bottom: 8px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .prompt-user {
+            color: #4ec9b0;
+            font-weight: bold;
+        }
+        .prompt-sep {
+            color: #eaeaea;
+        }
+        .prompt-dir {
+            color: #569cd6;
+            font-weight: bold;
+        }
+        .input-line {
+            display: flex;
+            align-items: center;
+            margin-top: 6px;
+        }
+        .prompt {
+            margin-right: 8px;
+            white-space: nowrap;
+        }
+        #cmd-input {
+            background: transparent;
+            border: none;
+            color: #eaeaea;
+            font-family: inherit;
+            font-size: inherit;
+            flex-grow: 1;
+            outline: none;
+            caret-color: #4ec9b0;
+        }
+        a {
+            color: #4ec9b0;
+            text-decoration: none;
+            border-bottom: 1px dashed #4ec9b0;
+            transition: 0.2s;
+        }
+        a:hover {
+            color: #fff;
+            border-bottom-color: #fff;
+        }
+        .cmd-highlight {
+            color: #ce9178;
+            font-weight: bold;
+        }
+        .error-text {
+            color: #f44747;
+        }
+        /* Мигающий курсор во время печати ответа */
+        .typing-cursor::after {
+            content: '▋';
+            color: #4ec9b0;
+            animation: blink 0.8s step-end infinite;
+            margin-left: 2px;
+        }
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+        .terminal-body::-webkit-scrollbar {
+            width: 6px;
+        }
+        .terminal-body::-webkit-scrollbar-thumb {
+            background-color: #444;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="terminal-window" onclick="focusInput()">
+    <div class="title-bar">
+        <div class="dots">
+            <div class="dot red"></div>
+            <div class="dot yellow"></div>
+            <div class="dot green"></div>
+        </div>
+        <div class="title">skynette@linux: ~</div>
+    </div>
+    <div class="terminal-body" id="terminal-body">
+        <div id="output"></div>
+        <div class="input-line" id="input-container" style="display: none;">
+            <span class="prompt"><span class="prompt-user">skynette@linux</span><span class="prompt-sep">:</span><span class="prompt-dir">~</span><span class="prompt-sep">$</span></span>
+            <input type="text" id="cmd-input" autocomplete="off" spellcheck="false">
+        </div>
+    </div>
+</div>
+
+<script>
+    const output = document.getElementById('output');
+    const inputContainer = document.getElementById('input-container');
+    const cmdInput = document.getElementById('cmd-input');
+    const terminalBody = document.getElementById('terminal-body');
+
+    let isTyping = false;
+
+    function focusInput() {
+        if (!isTyping) {
+            cmdInput.focus();
+        }
+    }
+
+    // Универсальная анимация посимвольной печати (поддерживает HTML-теги и ссылки)
+    function typeHTML(element, html, speed = 18, callback) {
+        isTyping = true;
+        inputContainer.style.display = 'none';
+        element.classList.add('typing-cursor');
+
+        let i = 0;
+        let currentHTML = '';
+
+        function step() {
+            if (i < html.length) {
+                if (html[i] === '<') {
+                    // Пропускаем HTML-теги целиком, чтобы они не ломались при печати
+                    let tagEnd = html.indexOf('>', i);
+                    if (tagEnd !== -1) {
+                        currentHTML += html.substring(i, tagEnd + 1);
+                        i = tagEnd + 1;
+                    }
+                } else {
+                    currentHTML += html[i];
+                    i++;
+                }
+                element.innerHTML = currentHTML;
+                terminalBody.scrollTop = terminalBody.scrollHeight;
+                setTimeout(step, speed);
+            } else {
+                element.classList.remove('typing-cursor');
+                isTyping = false;
+                inputContainer.style.display = 'flex';
+                cmdInput.focus();
+                terminalBody.scrollTop = terminalBody.scrollHeight;
+                if (callback) callback();
+            }
+        }
+        step();
+    }
+
+    // Приветствие при загрузке
+    window.onload = () => {
+        const line = document.createElement('div');
+        line.className = 'output-line';
+        output.appendChild(line);
+        typeHTML(line, "Инициализация протокола... Готово. Введите help для списка команд.", 22);
+    };
+
+    const commands = {
+        help: () => {
+            return `<span class="cmd-highlight">help</span>    - помощь по командам\n<span class="cmd-highlight">socials</span> - ссылки на соц. сети\n<span class="cmd-highlight">about</span>   - пара слов обо мне\n<span class="cmd-highlight">clear</span>   - очистить консоль`;
+        },
+        socials: () => {
+            return `- Telegram: \n<a href="https://t.me/waifumaster" target="_blank">t.me/waifumaster</a>`;
+        },
+        about: () => {
+            return `привет! добро пожаловать в терминал.\nменя зовут скайнет, мне 16 лет. больше ничего не могу сказать`;
+        }
+    };
+
+    cmdInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !isTyping) {
+            const rawVal = this.value;
+            const cmd = rawVal.trim().toLowerCase();
+            this.value = '';
+
+            // Оставляем введенную команду в истории
+            const cmdLine = document.createElement('div');
+            cmdLine.className = 'output-line';
+            cmdLine.innerHTML = `<span class="prompt"><span class="prompt-user">skynette@linux</span><span class="prompt-sep">:</span><span class="prompt-dir">~</span><span class="prompt-sep">$</span></span> ` + escapeHtml(rawVal);
+            output.appendChild(cmdLine);
+
+            if (cmd === 'clear') {
+                output.innerHTML = '';
+                return;
+            }
+
+            if (cmd !== '') {
+                const responseLine = document.createElement('div');
+                responseLine.className = 'output-line';
+                output.appendChild(responseLine);
+
+                let responseHTML = '';
+                if (commands[cmd]) {
+                    responseHTML = commands[cmd]();
+                } else {
+                    responseHTML = `<span class="error-text">bash: ${escapeHtml(cmd)}: команда не найдена. Введите <b>help</b> для списка команд.</span>`;
+                }
+
+                typeHTML(responseLine, responseHTML, 18);
+            }
+            terminalBody.scrollTop = terminalBody.scrollHeight;
+        }
+    });
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.innerText = text;
+        return div.innerHTML;
+    }
+</script>
+
+</body>
+</html>
