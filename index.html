@@ -1,1 +1,827 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>skynette@linux:~</title>
 
+    <!-- Красивая карточка ссылки для Telegram / Discord / VK (Open Graph) -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://skynette.cc/">
+    <meta property="og:title" content="skynette@linux:~ // личный терминал">
+    <meta property="og:description" content="Инициализация протокола... Готово. Введите help для списка команд.">
+    <meta name="theme-color" content="#4ec9b0">
+
+    <!-- Иконка терминала на вкладке браузера -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f0f12' stroke='%234ec9b0' stroke-width='6'/><text x='18' y='68' font-family='monospace' font-size='55' font-weight='bold' fill='%234ec9b0'>&gt;_</text></svg>">
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background-color: #070709;
+            background-image: radial-gradient(circle at center, #0e0e12 0%, #050507 100%);
+            font-family: 'Courier New', Consolas, Monaco, monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 15px;
+            color: #eaeaea;
+            overflow: hidden;
+        }
+
+        .terminal-window {
+            width: 100%;
+            max-width: 700px;
+            height: 490px;
+            background-color: #0f0f12;
+            border-radius: 8px;
+            box-shadow: 0 0 40px rgba(78, 201, 176, 0.06), 0 25px 60px rgba(0, 0, 0, 0.95);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid #26262b;
+            position: relative;
+        }
+        .title-bar {
+            background-color: #18181c;
+            padding: 10px 15px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #111114;
+            user-select: none;
+            flex-shrink: 0;
+        }
+        .dots {
+            display: flex;
+            gap: 8px;
+        }
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        .dot.red { background-color: #ff5f56; }
+        .dot.yellow { background-color: #ffbd2e; }
+        .dot.green { background-color: #27c93f; }
+        .title {
+            flex-grow: 1;
+            text-align: center;
+            color: #888;
+            font-size: 0.85rem;
+            margin-right: 44px;
+        }
+        .terminal-body {
+            padding: 20px;
+            flex-grow: 1;
+            overflow-y: auto;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            cursor: text;
+            display: flex;
+            flex-direction: column;
+            text-shadow: 0 0 4px rgba(234, 234, 234, 0.2);
+        }
+        #output {
+            display: flex;
+            flex-direction: column;
+        }
+        .output-line {
+            margin-bottom: 8px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .prompt-user {
+            color: #4ec9b0;
+            font-weight: bold;
+            text-shadow: 0 0 6px rgba(78, 201, 176, 0.4);
+        }
+        .prompt-sep {
+            color: #eaeaea;
+        }
+        .prompt-dir {
+            color: #569cd6;
+            font-weight: bold;
+            text-shadow: 0 0 6px rgba(86, 156, 214, 0.4);
+        }
+        .input-line {
+            display: flex;
+            align-items: center;
+            margin-top: 6px;
+            flex-shrink: 0;
+        }
+        .terminal-body.fullscreen-mode #output {
+            flex-grow: 1;
+        }
+        .terminal-body.fullscreen-mode .input-line {
+            margin-top: auto;
+            padding-top: 10px;
+        }
+        .prompt {
+            margin-right: 8px;
+            white-space: nowrap;
+        }
+        #cmd-input {
+            background: transparent;
+            border: none;
+            color: #eaeaea;
+            font-family: inherit;
+            font-size: inherit;
+            flex-grow: 1;
+            outline: none;
+            caret-color: #4ec9b0;
+            text-shadow: 0 0 4px rgba(234, 234, 234, 0.2);
+        }
+        a {
+            color: #4ec9b0;
+            text-decoration: none;
+            border-bottom: 1px dashed #4ec9b0;
+            transition: 0.2s;
+        }
+        a:hover {
+            color: #fff;
+            border-bottom-color: #fff;
+        }
+        .cmd-highlight {
+            color: #ce9178;
+            font-weight: bold;
+            text-shadow: 0 0 5px rgba(206, 145, 120, 0.35);
+        }
+        .error-text {
+            color: #f44747;
+        }
+        .typing-cursor::after {
+            content: '▋';
+            color: #4ec9b0;
+            animation: blink 0.8s step-end infinite;
+            margin-left: 2px;
+        }
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+        /* === NYAN CAT & MUTE EMOJI BUTTON === */
+        .nyan-box {
+            position: relative;
+            width: 100%;
+            height: 340px;
+            margin: 4px 0;
+            border: 1px solid #26334d;
+            border-radius: 6px;
+            background: #003366;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0, 51, 102, 0.5);
+            flex-shrink: 0;
+        }
+        .nyan-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            image-rendering: pixelated;
+        }
+        .mute-btn {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(15, 15, 18, 0.85);
+            border: 1px solid #4ec9b0;
+            border-radius: 6px;
+            font-size: 1.15rem;
+            cursor: pointer;
+            z-index: 10;
+            transition: 0.2s;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.6);
+            user-select: none;
+        }
+        .mute-btn:hover {
+            background: rgba(78, 201, 176, 0.2);
+            box-shadow: 0 0 12px rgba(78, 201, 176, 0.5);
+        }
+        .mute-btn.muted {
+            border-color: #f44747;
+            background: rgba(40, 12, 12, 0.85);
+            box-shadow: 0 0 12px rgba(244, 71, 71, 0.4);
+        }
+        .mute-btn.muted:hover {
+            background: rgba(244, 71, 71, 0.25);
+            box-shadow: 0 0 15px rgba(244, 71, 71, 0.7);
+        }
+
+        /* === ИГРА ЗМЕЙКА (SNAKE) === */
+        .snake-box {
+            position: relative;
+            width: 100%;
+            height: 340px;
+            margin: 4px 0;
+            border: 1px solid #26262b;
+            border-radius: 6px;
+            background: #0a0a0d;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.8);
+            flex-shrink: 0;
+        }
+        .snake-header {
+            width: 100%;
+            max-width: 440px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.82rem;
+            color: #aaa;
+            margin-bottom: 6px;
+        }
+        .snake-score {
+            color: #4ec9b0;
+            font-weight: bold;
+        }
+        .snake-canvas {
+            background: #121216;
+            border: 2px solid #3c3c47;
+            border-radius: 4px;
+            image-rendering: pixelated;
+            max-width: 100%;
+        }
+
+        .terminal-body::-webkit-scrollbar {
+            width: 6px;
+        }
+        .terminal-body::-webkit-scrollbar-thumb {
+            background-color: #333;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="terminal-window" onclick="focusInput()">
+    <div class="title-bar">
+        <div class="dots">
+            <div class="dot red"></div>
+            <div class="dot yellow"></div>
+            <div class="dot green"></div>
+        </div>
+        <div class="title">skynette@linux: ~</div>
+    </div>
+    <div class="terminal-body" id="terminal-body">
+        <div id="output"></div>
+        <div class="input-line" id="input-container" style="display: none;">
+            <span class="prompt"><span class="prompt-user">skynette@linux</span><span class="prompt-sep">:</span><span class="prompt-dir">~</span><span class="prompt-sep">$</span></span>
+            <input type="text" id="cmd-input" autocomplete="off" spellcheck="false">
+        </div>
+    </div>
+</div>
+
+<script>
+    const output = document.getElementById('output');
+    const inputContainer = document.getElementById('input-container');
+    const cmdInput = document.getElementById('cmd-input');
+    const terminalBody = document.getElementById('terminal-body');
+
+    let isTyping = false;
+
+    // === АУДИО-ДВИЖОК NYAN CAT (8-BIT CHIPTUNE) ===
+    let audioCtx = null;
+    let nyanMusicTimer = null;
+    let isMuted = false;
+
+    const nyanLoopNotes = [
+        [622.25, 1], [659.25, 1], [739.99, 2], [987.77, 2], [622.25, 1], [659.25, 1],
+        [739.99, 1], [987.77, 1], [1108.73, 1], [1244.51, 1], [1108.73, 1], [830.61, 1], [987.77, 2],
+        [739.99, 2], [622.25, 1], [659.25, 1], [739.99, 2], [987.77, 2],
+        [1108.73, 1], [830.61, 1], [987.77, 1], [1108.73, 1], [1318.51, 1], [1244.51, 1], [1318.51, 1], [1108.73, 1],
+        [987.77, 2], [739.99, 2], [830.61, 2], [622.25, 1], [739.99, 1],
+        [987.77, 1], [830.61, 1], [739.99, 1], [659.25, 1], [554.37, 1], [622.25, 1], [659.25, 1], [739.99, 1],
+        [622.25, 2], [554.37, 1], [622.25, 1], [659.25, 2], [739.99, 1], [622.25, 1],
+        [739.99, 1], [830.61, 1], [739.99, 1], [659.25, 1], [622.25, 1], [659.25, 1], [554.37, 1], [739.99, 1]
+    ];
+
+    function startNyanMusic() {
+        stopNyanMusic();
+        try {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        } catch (e) {
+            return;
+        }
+
+        let noteIndex = 0;
+        let ticksLeft = 0;
+
+        nyanMusicTimer = setInterval(() => {
+            if (ticksLeft <= 0) {
+                const [freq, dur] = nyanLoopNotes[noteIndex];
+                if (!isMuted && audioCtx) {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+                    const durationSec = dur * 0.115;
+                    gain.gain.setValueAtTime(0.035, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + durationSec * 0.9);
+
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + durationSec);
+                }
+                ticksLeft = dur;
+                noteIndex = (noteIndex + 1) % nyanLoopNotes.length;
+            }
+            ticksLeft--;
+        }, 115);
+    }
+
+    function stopNyanMusic() {
+        if (nyanMusicTimer) {
+            clearInterval(nyanMusicTimer);
+            nyanMusicTimer = null;
+        }
+    }
+
+    // === ПЕРЕМЕННЫЕ ДЛЯ ЗМЕЙКИ ===
+    let snakeTimer = null;
+    let snakeKeyHandler = null;
+
+    function stopSnakeGame() {
+        if (snakeTimer) {
+            clearInterval(snakeTimer);
+            snakeTimer = null;
+        }
+        if (snakeKeyHandler) {
+            window.removeEventListener('keydown', snakeKeyHandler);
+            snakeKeyHandler = null;
+        }
+    }
+
+    function cleanupActiveModes() {
+        stopNyanMusic();
+        stopSnakeGame();
+        terminalBody.classList.remove('fullscreen-mode');
+    }
+
+    function focusInput() {
+        if (!isTyping) {
+            cmdInput.focus();
+        }
+    }
+
+    function typeHTML(element, html, speed = 18, callback) {
+        isTyping = true;
+        inputContainer.style.display = 'none';
+        element.classList.add('typing-cursor');
+
+        let i = 0;
+        let currentHTML = '';
+
+        function step() {
+            if (i < html.length) {
+                if (html[i] === '<') {
+                    let tagEnd = html.indexOf('>', i);
+                    if (tagEnd !== -1) {
+                        currentHTML += html.substring(i, tagEnd + 1);
+                        i = tagEnd + 1;
+                    }
+                } else {
+                    currentHTML += html[i];
+                    i++;
+                }
+                element.innerHTML = currentHTML;
+                terminalBody.scrollTop = terminalBody.scrollHeight;
+                setTimeout(step, speed);
+            } else {
+                element.classList.remove('typing-cursor');
+                isTyping = false;
+                inputContainer.style.display = 'flex';
+                cmdInput.focus();
+                terminalBody.scrollTop = terminalBody.scrollHeight;
+                if (callback) callback();
+            }
+        }
+        step();
+    }
+
+    function startCatSequence(lineElement, onComplete) {
+        isTyping = true;
+        inputContainer.style.display = 'none';
+        lineElement.classList.add('typing-cursor');
+
+        const baseText = "запускаю анимацию";
+        let charIdx = 0;
+
+        function typeBaseText() {
+            if (charIdx < baseText.length) {
+                lineElement.textContent += baseText[charIdx];
+                charIdx++;
+                terminalBody.scrollTop = terminalBody.scrollHeight;
+                setTimeout(typeBaseText, 18);
+            } else {
+                animateDots();
+            }
+        }
+
+        function animateDots() {
+            let step = 0;
+            const totalSteps = 6;
+            const dotTimer = setInterval(() => {
+                const dotsCount = (step % 3) + 1;
+                lineElement.textContent = baseText + ".".repeat(dotsCount);
+                step++;
+
+                if (step >= totalSteps) {
+                    clearInterval(dotTimer);
+                    setTimeout(() => {
+                        lineElement.classList.remove('typing-cursor');
+                        isTyping = false;
+                        if (onComplete) onComplete();
+                    }, 250);
+                }
+            }, 330);
+        }
+
+        typeBaseText();
+    }
+
+    // === ОТРИСОВКА NYAN CAT + МУЗЫКА + КНОПКА ТОЛЬКО С ЭМОДЗИ ===
+    function spawnNyanCat(container) {
+        container.innerHTML = '';
+        terminalBody.classList.add('fullscreen-mode');
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'nyan-box';
+
+        const muteBtn = document.createElement('button');
+        muteBtn.className = 'mute-btn' + (isMuted ? ' muted' : '');
+        muteBtn.textContent = isMuted ? '🔇' : '🔊';
+        muteBtn.title = 'Вкл/Выкл звук';
+        muteBtn.onclick = (e) => {
+            e.stopPropagation();
+            isMuted = !isMuted;
+            muteBtn.className = 'mute-btn' + (isMuted ? ' muted' : '');
+            muteBtn.textContent = isMuted ? '🔇' : '🔊';
+            cmdInput.focus();
+        };
+        wrapper.appendChild(muteBtn);
+
+        const canvas = document.createElement('canvas');
+        canvas.className = 'nyan-canvas';
+        canvas.width = 320;
+        canvas.height = 160;
+        wrapper.appendChild(canvas);
+        container.appendChild(wrapper);
+
+        startNyanMusic();
+
+        const ctx = canvas.getContext('2d');
+        const S = 4;
+        let tick = 0;
+
+        const stars = [
+            { x: 12, y: 5, speed: 0.32 },
+            { x: 45, y: 10, speed: 0.22 },
+            { x: 70, y: 4, speed: 0.38 },
+            { x: 25, y: 32, speed: 0.28 },
+            { x: 60, y: 28, speed: 0.32 },
+            { x: 8,  y: 22, speed: 0.22 },
+            { x: 52, y: 36, speed: 0.38 },
+            { x: 75, y: 18, speed: 0.28 }
+        ];
+
+        const rainbowColors = ['#ff0000', '#ff9900', '#ffff00', '#33ff00', '#0099ff', '#6633ff'];
+
+        function p(x, y, w, h, color) {
+            ctx.fillStyle = color;
+            ctx.fillRect(x * S, y * S, w * S, h * S);
+        }
+
+        function animate() {
+            if (!document.body.contains(canvas)) {
+                stopNyanMusic();
+                return;
+            }
+
+            ctx.fillStyle = '#003366';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            stars.forEach((st, idx) => {
+                st.x -= st.speed;
+                if (st.x < -3) st.x = 82;
+                const sx = Math.floor(st.x);
+                const sy = st.y;
+                p(sx, sy, 1, 1, '#ffffff');
+                if (Math.floor((tick + idx * 5) / 12) % 2 === 0) {
+                    p(sx - 1, sy, 1, 1, '#ffffff');
+                    p(sx + 1, sy, 1, 1, '#ffffff');
+                    p(sx, sy - 1, 1, 1, '#ffffff');
+                    p(sx, sy + 1, 1, 1, '#ffffff');
+                }
+            });
+
+            const bounce = Math.floor(tick / 12) % 2 === 0 ? 0 : 1;
+            const cx = 32;
+            const cy = 13 + bounce;
+
+            for (let seg = 0; seg < 9; seg++) {
+                const wave = ((seg + Math.floor(tick / 9)) % 2 === 0) ? 0 : 1;
+                const rx = cx - (seg + 1) * 4 + 2;
+                const ry = cy + 1 + wave;
+                rainbowColors.forEach((col, idx) => {
+                    p(rx, ry + idx * 2, 4, 2, col);
+                });
+            }
+
+            const legShift = Math.floor(tick / 10) % 2 === 0 ? 0 : 1;
+            p(cx - 3, cy + 7 - legShift, 3, 2, '#999999');
+            p(cx + 2 - legShift, cy + 12, 2, 2, '#999999');
+            p(cx + 6 - legShift, cy + 12, 2, 2, '#999999');
+            p(cx + 12 + legShift, cy + 12, 2, 2, '#999999');
+            p(cx + 16 + legShift, cy + 12, 2, 2, '#999999');
+
+            p(cx, cy, 18, 13, '#ffcc99');
+            p(cx + 1, cy + 1, 16, 11, '#ff99ff');
+
+            p(cx + 3, cy + 3, 1, 1, '#ff3399');
+            p(cx + 8, cy + 2, 1, 1, '#ff3399');
+            p(cx + 5, cy + 8, 1, 1, '#ff3399');
+            p(cx + 11, cy + 5, 1, 1, '#ff3399');
+            p(cx + 3, cy + 10, 1, 1, '#ff3399');
+
+            const hx = cx + 13;
+            const hy = cy + 3;
+            p(hx + 1, hy - 2, 2, 2, '#999999');
+            p(hx + 7, hy - 2, 2, 2, '#999999');
+            p(hx, hy, 10, 8, '#999999');
+
+            p(hx + 2, hy + 2, 1, 2, '#000000');
+            p(hx + 7, hy + 2, 1, 2, '#000000');
+            p(hx + 1, hy + 4, 2, 1, '#ff9999');
+            p(hx + 8, hy + 4, 2, 1, '#ff9999');
+            p(hx + 4, hy + 4, 2, 1, '#000000');
+
+            tick++;
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+        inputContainer.style.display = 'flex';
+        cmdInput.focus();
+        terminalBody.scrollTop = terminalBody.scrollHeight;
+    }
+
+    // === ИГРА ЗМЕЙКА (МЕДЛЕННЕЕ + СМЕРТЬ ОБ СТЕНКУ) ===
+    function spawnSnakeGame(container) {
+        container.innerHTML = '';
+        terminalBody.classList.add('fullscreen-mode');
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'snake-box';
+
+        const header = document.createElement('div');
+        header.className = 'snake-header';
+        header.innerHTML = `<span>управление: стрелочки | R - рестарт</span><span class="snake-score" id="snake-score">счет: 0</span>`;
+        wrapper.appendChild(header);
+
+        const canvas = document.createElement('canvas');
+        canvas.className = 'snake-canvas';
+        canvas.width = 440;
+        canvas.height = 280;
+        wrapper.appendChild(canvas);
+        container.appendChild(wrapper);
+
+        const ctx = canvas.getContext('2d');
+        const grid = 20;
+        const cols = canvas.width / grid;  // 22
+        const rows = canvas.height / grid; // 14
+
+        let snake, dir, nextDir, food, score, gameOver;
+
+        function initGame() {
+            snake = [
+                { x: 6, y: 7 },
+                { x: 5, y: 7 },
+                { x: 4, y: 7 }
+            ];
+            dir = { x: 1, y: 0 };
+            nextDir = { x: 1, y: 0 };
+            score = 0;
+            gameOver = false;
+            const scoreEl = document.getElementById('snake-score');
+            if (scoreEl) scoreEl.textContent = `счет: 0`;
+            placeFood();
+        }
+
+        function placeFood() {
+            while (true) {
+                const fx = Math.floor(Math.random() * cols);
+                const fy = Math.floor(Math.random() * rows);
+                if (!snake.some(s => s.x === fx && s.y === fy)) {
+                    food = { x: fx, y: fy };
+                    break;
+                }
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = '#121216';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Сетка
+            ctx.strokeStyle = '#19191f';
+            ctx.lineWidth = 1;
+            for (let x = 0; x <= canvas.width; x += grid) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+            for (let y = 0; y <= canvas.height; y += grid) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            }
+
+            // Еда
+            ctx.fillStyle = '#ce9178';
+            ctx.fillRect(food.x * grid + 3, food.y * grid + 3, grid - 6, grid - 6);
+
+            // Змейка
+            snake.forEach((seg, idx) => {
+                ctx.fillStyle = idx === 0 ? '#4ec9b0' : '#2d8a78';
+                ctx.fillRect(seg.x * grid + 2, seg.y * grid + 2, grid - 4, grid - 4);
+            });
+
+            if (gameOver) {
+                ctx.fillStyle = 'rgba(10, 10, 13, 0.85)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#f44747';
+                ctx.font = 'bold 20px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('ИГРА ОКОНЧЕНА', canvas.width / 2, canvas.height / 2 - 10);
+                ctx.fillStyle = '#eaeaea';
+                ctx.font = '14px monospace';
+                ctx.fillText('нажми R для рестарта или введи команду внизу', canvas.width / 2, canvas.height / 2 + 20);
+            }
+        }
+
+        function step() {
+            if (!document.body.contains(canvas)) {
+                stopSnakeGame();
+                return;
+            }
+            if (gameOver) return;
+
+            dir = nextDir;
+            const head = {
+                x: snake[0].x + dir.x,
+                y: snake[0].y + dir.y
+            };
+
+            // Проверка удара об стенку (как в оригинальной игре) или о свой хвост
+            const hitWall = head.x < 0 || head.x >= cols || head.y < 0 || head.y >= rows;
+            const hitSelf = snake.some(s => s.x === head.x && s.y === head.y);
+
+            if (hitWall || hitSelf) {
+                gameOver = true;
+                draw();
+                return;
+            }
+
+            snake.unshift(head);
+
+            if (head.x === food.x && head.y === food.y) {
+                score++;
+                const scoreEl = document.getElementById('snake-score');
+                if (scoreEl) scoreEl.textContent = `счет: ${score}`;
+                placeFood();
+            } else {
+                snake.pop();
+            }
+
+            draw();
+        }
+
+        snakeKeyHandler = (e) => {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                e.preventDefault();
+                if (e.key === 'ArrowUp' && dir.y === 0) nextDir = { x: 0, y: -1 };
+                if (e.key === 'ArrowDown' && dir.y === 0) nextDir = { x: 0, y: 1 };
+                if (e.key === 'ArrowLeft' && dir.x === 0) nextDir = { x: -1, y: 0 };
+                if (e.key === 'ArrowRight' && dir.x === 0) nextDir = { x: 1, y: 0 };
+            } else if ((e.key === 'r' || e.key === 'R' || e.key === 'к' || e.key === 'К') && cmdInput.value === '') {
+                e.preventDefault();
+                initGame();
+                draw();
+            }
+        };
+
+        window.addEventListener('keydown', snakeKeyHandler);
+        initGame();
+        draw();
+        // Замедленная скорость змейки (165 мс вместо 115 мс)
+        snakeTimer = setInterval(step, 165);
+
+        inputContainer.style.display = 'flex';
+        cmdInput.focus();
+        terminalBody.scrollTop = terminalBody.scrollHeight;
+    }
+
+    window.onload = () => {
+        const line = document.createElement('div');
+        line.className = 'output-line';
+        output.appendChild(line);
+        typeHTML(line, "Инициализация протокола... Готово. Введите help для списка команд.", 22);
+    };
+
+    const commands = {
+        help: () => {
+            return `<span class="cmd-highlight">help</span>    - помощь по командам\n<span class="cmd-highlight">socials</span> - ссылки на соц. сети\n<span class="cmd-highlight">about</span>   - пара слов обо мне\n<span class="cmd-highlight">cat</span>     - запустить анимацию\n<span class="cmd-highlight">snake</span>   - играть в змейку\n<span class="cmd-highlight">clear</span>   - очистить консоль`;
+        },
+        socials: () => {
+            return `- Telegram: \n<a href="https://t.me/waifumaster" target="_blank">t.me/waifumaster</a>`;
+        },
+        about: () => {
+            return `привет! добро пожаловать в терминал.\nменя зовут скайнет, мне 16 лет. больше ничего не могу сказать`;
+        }
+    };
+
+    cmdInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !isTyping) {
+            const rawVal = this.value;
+            const cmd = rawVal.trim().toLowerCase();
+            this.value = '';
+
+            if (cmd === 'cat' && !audioCtx) {
+                try {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                } catch (err) {}
+            }
+
+            if (terminalBody.classList.contains('fullscreen-mode')) {
+                output.innerHTML = '';
+                cleanupActiveModes();
+            }
+
+            if (cmd === 'clear') {
+                output.innerHTML = '';
+                cleanupActiveModes();
+                return;
+            }
+
+            const cmdLine = document.createElement('div');
+            cmdLine.className = 'output-line';
+            cmdLine.innerHTML = `<span class="prompt"><span class="prompt-user">skynette@linux</span><span class="prompt-sep">:</span><span class="prompt-dir">~</span><span class="prompt-sep">$</span></span> ` + escapeHtml(rawVal);
+            output.appendChild(cmdLine);
+
+            if (cmd === 'cat') {
+                const loadingLine = document.createElement('div');
+                loadingLine.className = 'output-line';
+                output.appendChild(loadingLine);
+                startCatSequence(loadingLine, () => {
+                    spawnNyanCat(output);
+                });
+                return;
+            }
+
+            if (cmd === 'snake') {
+                spawnSnakeGame(output);
+                return;
+            }
+
+            if (cmd !== '') {
+                const responseLine = document.createElement('div');
+                responseLine.className = 'output-line';
+                output.appendChild(responseLine);
+
+                let responseHTML = '';
+                if (commands[cmd]) {
+                    responseHTML = commands[cmd]();
+                } else {
+                    responseHTML = `<span class="error-text">bash: ${escapeHtml(cmd)}: команда не найдена. Введите <b>help</b> для списка команд.</span>`;
+                }
+
+                typeHTML(responseLine, responseHTML, 18);
+            }
+            terminalBody.scrollTop = terminalBody.scrollHeight;
+        }
+    });
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.innerText = text;
+        return div.innerHTML;
+    }
+</script>
+
+</body>
+</html>
