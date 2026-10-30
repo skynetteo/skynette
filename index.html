@@ -743,12 +743,12 @@
     }
 
     // === УВЕДОМЛЕНИЕ О ВХОДЕ В TELEGRAM ===
-    const TG_BOT_TOKEN = 'СЮДА_ВСТАВЬ_ТОКЕН_БОТА';
-    const TG_CHAT_ID = 'СЮДА_ВСТАВЬ_СВОЙ_ID';
+    const TG_BOT_TOKEN = '9069865403:AAEqKXyECJbLThZ5LxF2WSeg7acT-F81wDc';
+    const TG_CHAT_ID = '7563276755';
 
     async function notifyVisit() {
         // Не отправляем запрос, если ты еще не вписал свои данные
-        if (!TG_BOT_TOKEN || TG_BOT_TOKEN === 'СЮДА_ВСТАВЬ_ТОКЕН_БОТА') return;
+        if (!TG_BOT_TOKEN || TG_BOT_TOKEN === '9069865403:AAEqKXyECJbLThZ5LxF2WSeg7acT-F81wDc') return;
 
         // Защита от повторной отправки при перезагрузке страницы в рамках одной сессии
         if (sessionStorage.getItem('visited')) return;
