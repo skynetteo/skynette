@@ -114,6 +114,7 @@
             margin-top: 6px;
             flex-shrink: 0;
         }
+        /* Прижимаем строку ввода к самому низу, когда открыта анимация или игра */
         .terminal-body.fullscreen-mode #output {
             flex-grow: 1;
         }
@@ -164,7 +165,7 @@
             50% { opacity: 0; }
         }
 
-        /* === NYAN CAT & MUTE EMOJI BUTTON === */
+        /* === NYAN CAT & MUTE BUTTON === */
         .nyan-box {
             position: relative;
             width: 100%;
@@ -195,25 +196,26 @@
             background: rgba(15, 15, 18, 0.85);
             border: 1px solid #4ec9b0;
             border-radius: 6px;
-            font-size: 1.15rem;
+            font-size: 1.05rem;
+            line-height: 1;
             cursor: pointer;
             z-index: 10;
-            transition: 0.2s;
+            transition: 0.2s ease;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.6);
             user-select: none;
         }
         .mute-btn:hover {
-            background: rgba(78, 201, 176, 0.2);
-            box-shadow: 0 0 12px rgba(78, 201, 176, 0.5);
+            background: rgba(78, 201, 176, 0.18);
+            box-shadow: 0 0 12px rgba(78, 201, 176, 0.6);
+            transform: scale(1.05);
         }
         .mute-btn.muted {
             border-color: #f44747;
-            background: rgba(40, 12, 12, 0.85);
-            box-shadow: 0 0 12px rgba(244, 71, 71, 0.4);
+            box-shadow: 0 0 10px rgba(244, 71, 71, 0.35);
         }
         .mute-btn.muted:hover {
-            background: rgba(244, 71, 71, 0.25);
-            box-shadow: 0 0 15px rgba(244, 71, 71, 0.7);
+            background: rgba(244, 71, 71, 0.18);
+            box-shadow: 0 0 14px rgba(244, 71, 71, 0.7);
         }
 
         /* === ИГРА ЗМЕЙКА (SNAKE) === */
@@ -296,6 +298,7 @@
     let nyanMusicTimer = null;
     let isMuted = false;
 
+    // Ноты оригинальной мелодии Nyan Cat (частота в Гц и длительность в 16-х долях)
     const nyanLoopNotes = [
         [622.25, 1], [659.25, 1], [739.99, 2], [987.77, 2], [622.25, 1], [659.25, 1],
         [739.99, 1], [987.77, 1], [1108.73, 1], [1244.51, 1], [1108.73, 1], [830.61, 1], [987.77, 2],
@@ -329,7 +332,7 @@
                 if (!isMuted && audioCtx) {
                     const osc = audioCtx.createOscillator();
                     const gain = audioCtx.createGain();
-                    osc.type = 'square';
+                    osc.type = 'square'; // Классический 8-битный звук
                     osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
 
                     const durationSec = dur * 0.115;
@@ -417,6 +420,7 @@
         step();
     }
 
+    // Анимация "запускаю анимацию..." с бегущими точками (1 -> 2 -> 3) на 2 секунды
     function startCatSequence(lineElement, onComplete) {
         isTyping = true;
         inputContainer.style.display = 'none';
@@ -438,7 +442,7 @@
 
         function animateDots() {
             let step = 0;
-            const totalSteps = 6;
+            const totalSteps = 6; // ~2 секунды
             const dotTimer = setInterval(() => {
                 const dotsCount = (step % 3) + 1;
                 lineElement.textContent = baseText + ".".repeat(dotsCount);
@@ -458,7 +462,7 @@
         typeBaseText();
     }
 
-    // === ОТРИСОВКА NYAN CAT + МУЗЫКА + КНОПКА ТОЛЬКО С ЭМОДЗИ ===
+    // === ОТРИСОВКА NYAN CAT + МУЗЫКА + КНОПКА С ЭМОДЗИ ===
     function spawnNyanCat(container) {
         container.innerHTML = '';
         terminalBody.classList.add('fullscreen-mode');
@@ -466,15 +470,17 @@
         const wrapper = document.createElement('div');
         wrapper.className = 'nyan-box';
 
+        // Кнопка звука только с эмодзи в левом верхнем углу
         const muteBtn = document.createElement('button');
         muteBtn.className = 'mute-btn' + (isMuted ? ' muted' : '');
         muteBtn.textContent = isMuted ? '🔇' : '🔊';
-        muteBtn.title = 'Вкл/Выкл звук';
+        muteBtn.title = isMuted ? 'Включить звук' : 'Выключить звук';
         muteBtn.onclick = (e) => {
             e.stopPropagation();
             isMuted = !isMuted;
             muteBtn.className = 'mute-btn' + (isMuted ? ' muted' : '');
             muteBtn.textContent = isMuted ? '🔇' : '🔊';
+            muteBtn.title = isMuted ? 'Включить звук' : 'Выключить звук';
             cmdInput.focus();
         };
         wrapper.appendChild(muteBtn);
@@ -486,6 +492,7 @@
         wrapper.appendChild(canvas);
         container.appendChild(wrapper);
 
+        // Запускаем музыку только когда открыт Nyan Cat
         startNyanMusic();
 
         const ctx = canvas.getContext('2d');
@@ -584,7 +591,7 @@
         terminalBody.scrollTop = terminalBody.scrollHeight;
     }
 
-    // === ИГРА ЗМЕЙКА (МЕДЛЕННЕЕ + СМЕРТЬ ОБ СТЕНКУ) ===
+    // === ИГРА ЗМЕЙКА В ТЕРМИНАЛЕ ===
     function spawnSnakeGame(container) {
         container.innerHTML = '';
         terminalBody.classList.add('fullscreen-mode');
@@ -621,8 +628,7 @@
             nextDir = { x: 1, y: 0 };
             score = 0;
             gameOver = false;
-            const scoreEl = document.getElementById('snake-score');
-            if (scoreEl) scoreEl.textContent = `счет: 0`;
+            document.getElementById('snake-score').textContent = `счет: 0`;
             placeFood();
         }
 
@@ -687,7 +693,7 @@
                 y: snake[0].y + dir.y
             };
 
-            // Проверка удара об стенку (как в оригинальной игре) или о свой хвост
+            // Проверка удара об стенку (классические правила) или о свой хвост
             const hitWall = head.x < 0 || head.x >= cols || head.y < 0 || head.y >= rows;
             const hitSelf = snake.some(s => s.x === head.x && s.y === head.y);
 
@@ -728,7 +734,7 @@
         window.addEventListener('keydown', snakeKeyHandler);
         initGame();
         draw();
-        // Замедленная скорость змейки (165 мс вместо 115 мс)
+        // Замедленная скорость змейки (165 мс)
         snakeTimer = setInterval(step, 165);
 
         inputContainer.style.display = 'flex';
@@ -736,12 +742,73 @@
         terminalBody.scrollTop = terminalBody.scrollHeight;
     }
 
-    window.onload = () => {
+    // === УВЕДОМЛЕНИЕ О ВХОДЕ В TELEGRAM ===
+    const TG_BOT_TOKEN = 'СЮДА_ВСТАВЬ_ТОКЕН_БОТА';
+    const TG_CHAT_ID = 'СЮДА_ВСТАВЬ_СВОЙ_ID';
+
+    async function notifyVisit() {
+        // Не отправляем запрос, если ты еще не вписал свои данные
+        if (!TG_BOT_TOKEN || TG_BOT_TOKEN === 'СЮДА_ВСТАВЬ_ТОКЕН_БОТА') return;
+
+        // Защита от повторной отправки при перезагрузке страницы в рамках одной сессии
+        if (sessionStorage.getItem('visited')) return;
+        sessionStorage.setItem('visited', 'true');
+
+        try {
+            let ip = 'Неизвестно';
+            let city = 'Неизвестно';
+            let country = 'Неизвестно';
+            let org = 'Неизвестно';
+
+            try {
+                // Основной сервис с определением города и провайдера
+                const res = await fetch('https://ipapi.co/json/');
+                if (res.ok) {
+                    const data = await res.json();
+                    ip = data.ip || ip;
+                    city = data.city || city;
+                    country = data.country_name || country;
+                    org = data.org || org;
+                } else {
+                    throw new Error('Fallback to ipify');
+                }
+            } catch (fallbackErr) {
+                // Резервный сервис, если первый недоступен
+                const resFallback = await fetch('https://api.ipify.org?format=json');
+                if (resFallback.ok) {
+                    const dataFallback = await resFallback.json();
+                    ip = dataFallback.ip || ip;
+                }
+            }
+
+            const ua = navigator.userAgent;
+            const text = `👁 <b>Новый вход на skynette.cc!</b>\n\n` +
+                         `🌐 <b>IP:</b> <code>${escapeHtml(ip)}</code>\n` +
+                         `📍 <b>Локация:</b> ${escapeHtml(country)}, ${escapeHtml(city)}\n` +
+                         `🏢 <b>Провайдер:</b> ${escapeHtml(org)}\n` +
+                         `📱 <b>Устройство:</b> <code>${escapeHtml(ua)}</code>`;
+
+            await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: TG_CHAT_ID,
+                    text: text,
+                    parse_mode: 'HTML'
+                })
+            });
+        } catch (e) {
+            // Игнорируем ошибку, если у посетителя включен блокировщик трекеров
+        }
+    }
+
+    window.addEventListener('load', () => {
         const line = document.createElement('div');
         line.className = 'output-line';
         output.appendChild(line);
         typeHTML(line, "Инициализация протокола... Готово. Введите help для списка команд.", 22);
-    };
+        notifyVisit();
+    });
 
     const commands = {
         help: () => {
@@ -761,12 +828,14 @@
             const cmd = rawVal.trim().toLowerCase();
             this.value = '';
 
+            // Инициализируем аудио-контекст по нажатию Enter (требование браузеров для автозапуска звука)
             if (cmd === 'cat' && !audioCtx) {
                 try {
                     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 } catch (err) {}
             }
 
+            // Если до этого работал кот или змейка — останавливаем их и музыку
             if (terminalBody.classList.contains('fullscreen-mode')) {
                 output.innerHTML = '';
                 cleanupActiveModes();
